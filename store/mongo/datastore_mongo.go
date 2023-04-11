@@ -44,6 +44,7 @@ const (
 	CollectionDeployments          = "deployments"
 	CollectionDeviceDeploymentLogs = "devices.logs"
 	CollectionDevices              = "devices"
+	CollectionDevicesLastStatus    = "devices_last_status"
 	CollectionStorageSettings      = "settings"
 	CollectionUploadIntents        = "uploads"
 )
@@ -378,7 +379,8 @@ const (
 // Database keys
 const (
 	// Need to be kept in sync with structure filed names
-	StorageKeyId = "_id"
+	StorageKeyId       = "_id"
+	StorageKeyTenantId = "tenant_id"
 
 	StorageKeyImageProvides    = "meta_artifact.provides"
 	StorageKeyImageProvidesIdx = "meta_artifact.provides_idx"
@@ -860,7 +862,7 @@ func (db *DataStoreMongo) UpdateUploadIntentStatus(
 	}
 	if idty := identity.FromContext(ctx); idty != nil {
 		q = append(q, bson.E{
-			Key:   "tenant_id",
+			Key:   StorageKeyTenantId,
 			Value: idty.Tenant,
 		})
 	}
@@ -1362,6 +1364,58 @@ func (db *DataStoreMongo) UpdateDeviceDeploymentStatus(
 	deploymentID string,
 	ddState model.DeviceDeploymentState,
 ) (model.DeviceDeploymentStatus, error) {
+	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
+	collDevs := database.Collection(CollectionDevices)
+	d, err := updateDeviceDeploymentStatus(
+		ctx,
+		*collDevs,
+		deviceID,
+		deploymentID,
+		ddState,
+		nil,
+	)
+	if err != nil {
+		return d, err
+	}
+
+	database = db.client.Database(DatabaseName)
+	collDevs = database.Collection(CollectionDevicesLastStatus)
+	tenantId := ""
+	id := identity.FromContext(ctx)
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	if ddState.Status.Successful() {
+		_, err = collDevs.DeleteMany(ctx, bson.M{
+			StorageKeyDeviceDeploymentDeviceId:     deviceID,
+			StorageKeyDeviceDeploymentDeploymentID: deploymentID,
+			StorageKeyTenantId:                     tenantId,
+		})
+	} else {
+		_, err = updateDeviceDeploymentStatus(
+			ctx,
+			*collDevs,
+			deviceID,
+			deploymentID,
+			ddState,
+			&tenantId,
+		)
+		if err != nil {
+			err = errors.Wrap(err, "error occurred while storing last status")
+		}
+	}
+
+	return d, err
+}
+
+func updateDeviceDeploymentStatus(
+	ctx context.Context,
+	collDevs mongo.Collection,
+	deviceID string,
+	deploymentID string,
+	ddState model.DeviceDeploymentState,
+	tenantId *string,
+) (model.DeviceDeploymentStatus, error) {
 
 	// Verify ID formatting
 	if len(deviceID) == 0 ||
@@ -1373,9 +1427,6 @@ func (db *DataStoreMongo) UpdateDeviceDeploymentStatus(
 		return model.DeviceDeploymentStatusNull, ErrStorageInvalidInput
 	}
 
-	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
-	collDevs := database.Collection(CollectionDevices)
-
 	// Device should know only about deployments that are not finished
 	query := bson.D{
 		{Key: StorageKeyDeviceDeploymentDeviceId, Value: deviceID},
@@ -1384,11 +1435,26 @@ func (db *DataStoreMongo) UpdateDeviceDeploymentStatus(
 			{Key: "$exists", Value: false},
 		}},
 	}
+	if tenantId != nil {
+		query = append(query, bson.E{
+			Key:   StorageKeyTenantId,
+			Value: *tenantId,
+		})
+	}
 
 	// update status field
-	set := bson.M{
-		StorageKeyDeviceDeploymentStatus: ddState.Status,
-		StorageKeyDeviceDeploymentActive: ddState.Status.Active(),
+	var set bson.M
+	if tenantId != nil {
+		set = bson.M{
+			StorageKeyDeviceDeploymentStatus: ddState.Status,
+			StorageKeyDeviceDeploymentActive: ddState.Status.Active(),
+			StorageKeyTenantId:               tenantId,
+		}
+	} else {
+		set = bson.M{
+			StorageKeyDeviceDeploymentStatus: ddState.Status,
+			StorageKeyDeviceDeploymentActive: ddState.Status.Active(),
+		}
 	}
 	// and finish time if provided
 	if ddState.FinishTime != nil {
