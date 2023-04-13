@@ -1182,7 +1182,13 @@ func (db *DataStoreMongo) InsertDeviceDeployment(
 	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
 	c := database.Collection(CollectionDevices)
 
-	saveLastDeviceDeployment(ctx, db.client.Database(DatabaseName), deviceDeployment)
+	saveLastDeviceDeploymentStatus(
+		ctx,
+		db.client.Database(DatabaseName),
+		&deviceDeployment.DeviceId,
+		&deviceDeployment.DeploymentId,
+		deviceDeployment.Status,
+	)
 
 	if _, err := c.InsertOne(ctx, deviceDeployment); err != nil {
 		return err
@@ -1196,37 +1202,6 @@ func (db *DataStoreMongo) InsertDeviceDeployment(
 	}
 
 	return nil
-}
-
-func saveLastDeviceDeployment(
-	ctx context.Context,
-	database *mongo.Database,
-	deviceDeployment *model.DeviceDeployment,
-	) error {
-	tenantId := ""
-	id := identity.FromContext(ctx)
-	if id != nil {
-		tenantId = id.Tenant
-	}
-	collDevs := database.Collection(CollectionDevicesLastStatus)
-	var err error
-	if deviceDeployment.Status.Successful() {
-		_, err = collDevs.DeleteMany(ctx, bson.M{
-			StorageKeyDeviceDeploymentDeviceId:     deviceDeployment.DeviceId,
-			StorageKeyDeviceDeploymentDeploymentID: deviceDeployment.DeploymentId,
-			StorageKeyTenantId:                     tenantId,
-		})
-	} else {
-		replaceOptions := mopts.Replace()
-		replaceOptions.SetUpsert(true)
-		filter:=bson.M{
-			StorageKeyDeviceDeploymentDeviceId:     deviceDeployment.DeviceId,
-			StorageKeyDeviceDeploymentDeploymentID: deviceDeployment.DeploymentId,
-			StorageKeyTenantId:                     tenantId,
-		}
-		_,err=collDevs.ReplaceOne(ctx, filter, deviceDeployment, replaceOptions)
-	}
-		return err
 }
 
 // InsertMany stores multiple device deployment objects.
@@ -1254,6 +1229,13 @@ func (db *DataStoreMongo) InsertMany(ctx context.Context,
 
 		list = append(list, deployment)
 		deviceCountIncrements[deployment.DeploymentId]++
+		saveLastDeviceDeploymentStatus(
+			ctx,
+			db.client.Database(DatabaseName),
+			&deployment.DeviceId,
+			&deployment.DeploymentId,
+			deployment.Status,
+		)
 	}
 
 	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
@@ -1397,58 +1379,6 @@ func (db *DataStoreMongo) UpdateDeviceDeploymentStatus(
 	deploymentID string,
 	ddState model.DeviceDeploymentState,
 ) (model.DeviceDeploymentStatus, error) {
-	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
-	collDevs := database.Collection(CollectionDevices)
-	d, err := updateDeviceDeploymentStatus(
-		ctx,
-		*collDevs,
-		deviceID,
-		deploymentID,
-		ddState,
-		nil,
-	)
-	if err != nil {
-		return d, err
-	}
-
-	database = db.client.Database(DatabaseName)
-	collDevs = database.Collection(CollectionDevicesLastStatus)
-	tenantId := ""
-	id := identity.FromContext(ctx)
-	if id != nil {
-		tenantId = id.Tenant
-	}
-	if ddState.Status.Successful() {
-		_, err = collDevs.DeleteMany(ctx, bson.M{
-			StorageKeyDeviceDeploymentDeviceId:     deviceID,
-			StorageKeyDeviceDeploymentDeploymentID: deploymentID,
-			StorageKeyTenantId:                     tenantId,
-		})
-	} else {
-		_, err = updateDeviceDeploymentStatus(
-			ctx,
-			*collDevs,
-			deviceID,
-			deploymentID,
-			ddState,
-			&tenantId,
-		)
-		if err != nil {
-			err = errors.Wrap(err, "error occurred while storing last status")
-		}
-	}
-
-	return d, err
-}
-
-func updateDeviceDeploymentStatus(
-	ctx context.Context,
-	collDevs mongo.Collection,
-	deviceID string,
-	deploymentID string,
-	ddState model.DeviceDeploymentState,
-	tenantId *string,
-) (model.DeviceDeploymentStatus, error) {
 
 	// Verify ID formatting
 	if len(deviceID) == 0 ||
@@ -1460,6 +1390,16 @@ func updateDeviceDeploymentStatus(
 		return model.DeviceDeploymentStatusNull, ErrStorageInvalidInput
 	}
 
+	saveLastDeviceDeploymentStatus(
+		ctx,
+		db.client.Database(DatabaseName),
+		&deviceID,
+		&deploymentID,
+		ddState.Status,
+	)
+	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
+	collDevs := database.Collection(CollectionDevices)
+
 	// Device should know only about deployments that are not finished
 	query := bson.D{
 		{Key: StorageKeyDeviceDeploymentDeviceId, Value: deviceID},
@@ -1468,26 +1408,11 @@ func updateDeviceDeploymentStatus(
 			{Key: "$exists", Value: false},
 		}},
 	}
-	if tenantId != nil {
-		query = append(query, bson.E{
-			Key:   StorageKeyTenantId,
-			Value: *tenantId,
-		})
-	}
 
 	// update status field
-	var set bson.M
-	if tenantId != nil {
-		set = bson.M{
-			StorageKeyDeviceDeploymentStatus: ddState.Status,
-			StorageKeyDeviceDeploymentActive: ddState.Status.Active(),
-			StorageKeyTenantId:               tenantId,
-		}
-	} else {
-		set = bson.M{
-			StorageKeyDeviceDeploymentStatus: ddState.Status,
-			StorageKeyDeviceDeploymentActive: ddState.Status.Active(),
-		}
+	set := bson.M{
+		StorageKeyDeviceDeploymentStatus: ddState.Status,
+		StorageKeyDeviceDeploymentActive: ddState.Status.Active(),
 	}
 	// and finish time if provided
 	if ddState.FinishTime != nil {
@@ -1936,6 +1861,13 @@ func (db *DataStoreMongo) AbortDeviceDeployments(ctx context.Context,
 		return ErrStorageInvalidID
 	}
 
+	saveLastDeviceDeploymentStatus(
+		ctx,
+		db.client.Database(DatabaseName),
+		nil,
+		&deploymentId,
+		model.DeviceDeploymentStatusAborted,
+	)
 	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
 	collDevs := database.Collection(CollectionDevices)
 	selector := bson.M{
@@ -1983,7 +1915,11 @@ func (db *DataStoreMongo) DeleteDeviceDeploymentsHistory(ctx context.Context,
 		return err
 	}
 
-	return nil
+	database = db.client.Database(DatabaseName)
+	collDevs = database.Collection(CollectionDevicesLastStatus)
+	_, err := collDevs.DeleteMany(ctx, bson.M{StorageKeyDeviceDeploymentDeviceId: deviceID})
+
+	return err
 }
 
 func (db *DataStoreMongo) DecommissionDeviceDeployments(ctx context.Context,
@@ -1993,6 +1929,13 @@ func (db *DataStoreMongo) DecommissionDeviceDeployments(ctx context.Context,
 		return ErrStorageInvalidID
 	}
 
+	saveLastDeviceDeploymentStatus(
+		ctx,
+		db.client.Database(DatabaseName),
+		&deviceId,
+		nil,
+		model.DeviceDeploymentStatusAborted,
+	)
 	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
 	collDevs := database.Collection(CollectionDevices)
 	selector := bson.M{
@@ -2832,4 +2775,47 @@ func (db *DataStoreMongo) UpdateDeploymentsWithArtifactName(
 
 func (db *DataStoreMongo) GetTenantDbs() ([]string, error) {
 	return migrate.GetTenantDbs(context.Background(), db.client, mstore.IsTenantDb(DbName))
+}
+
+func saveLastDeviceDeploymentStatus(
+	ctx context.Context,
+	database *mongo.Database,
+	deviceId *string,
+	deploymentId *string,
+	status model.DeviceDeploymentStatus,
+) error {
+	tenantId := ""
+	id := identity.FromContext(ctx)
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	filter := []bson.M{
+		{StorageKeyTenantId: tenantId},
+	}
+
+	if deviceId != nil {
+		filter = append(filter,
+			bson.M{
+				StorageKeyDeviceDeploymentDeviceId: *deviceId,
+			},
+		)
+	}
+	if deploymentId != nil {
+		filter = append(filter,
+			bson.M{
+				StorageKeyDeviceDeploymentDeploymentID: *deploymentId,
+			},
+		)
+	}
+
+	collDevs := database.Collection(CollectionDevicesLastStatus)
+	var err error
+	if status.Successful() {
+		_, err = collDevs.DeleteMany(ctx, filter)
+	} else {
+		replaceOptions := mopts.Replace()
+		replaceOptions.SetUpsert(true)
+		_, err = collDevs.ReplaceOne(ctx, filter, status, replaceOptions)
+	}
+	return err
 }
