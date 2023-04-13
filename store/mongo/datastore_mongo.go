@@ -1182,6 +1182,8 @@ func (db *DataStoreMongo) InsertDeviceDeployment(
 	database := db.client.Database(mstore.DbFromContext(ctx, DatabaseName))
 	c := database.Collection(CollectionDevices)
 
+	saveLastDeviceDeployment(ctx, db.client.Database(DatabaseName), deviceDeployment)
+
 	if _, err := c.InsertOne(ctx, deviceDeployment); err != nil {
 		return err
 	}
@@ -1194,6 +1196,37 @@ func (db *DataStoreMongo) InsertDeviceDeployment(
 	}
 
 	return nil
+}
+
+func saveLastDeviceDeployment(
+	ctx context.Context,
+	database *mongo.Database,
+	deviceDeployment *model.DeviceDeployment,
+	) error {
+	tenantId := ""
+	id := identity.FromContext(ctx)
+	if id != nil {
+		tenantId = id.Tenant
+	}
+	collDevs := database.Collection(CollectionDevicesLastStatus)
+	var err error
+	if deviceDeployment.Status.Successful() {
+		_, err = collDevs.DeleteMany(ctx, bson.M{
+			StorageKeyDeviceDeploymentDeviceId:     deviceDeployment.DeviceId,
+			StorageKeyDeviceDeploymentDeploymentID: deviceDeployment.DeploymentId,
+			StorageKeyTenantId:                     tenantId,
+		})
+	} else {
+		replaceOptions := mopts.Replace()
+		replaceOptions.SetUpsert(true)
+		filter:=bson.M{
+			StorageKeyDeviceDeploymentDeviceId:     deviceDeployment.DeviceId,
+			StorageKeyDeviceDeploymentDeploymentID: deviceDeployment.DeploymentId,
+			StorageKeyTenantId:                     tenantId,
+		}
+		_,err=collDevs.ReplaceOne(ctx, filter, deviceDeployment, replaceOptions)
+	}
+		return err
 }
 
 // InsertMany stores multiple device deployment objects.
