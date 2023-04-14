@@ -2770,3 +2770,25 @@ func (db *DataStoreMongo) SaveLastDeviceDeploymentStatus(
 	_, err = collDevs.ReplaceOne(ctx, filter, lastStatus, replaceOptions)
 	return err
 }
+
+func (db *DataStoreMongo) GetLastDeviceDeploymentStatus(
+	ctx context.Context,
+	devicesIds []string,
+) ([]model.DeviceDeploymentLastStatus, error) {
+	database := db.client.Database(DatabaseName)
+	collDevs := database.Collection(CollectionDevicesLastStatus)
+
+	filter := bson.M{"_id": bson.M{"$in": devicesIds}}
+	var statuses []model.DeviceDeploymentLastStatus
+	cursor, err := collDevs.Find(ctx, filter)
+	if err != nil {
+		return statuses, err
+	}
+
+	err = cursor.All(ctx, &statuses)
+	if err != nil {
+		return statuses, err
+	}
+
+	return statuses, err
+}
