@@ -24,6 +24,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
+	
 	"github.com/mendersoftware/deployments/model"
 )
 
@@ -173,6 +175,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 	}
 
 	deviceId1 := primitive.NewObjectID().String()
+	tenantId := primitive.NewObjectID().String()
 	now := time.Now()
 	pastNow := now.Add(time.Hour)
 	testCases := map[string]struct {
@@ -267,6 +270,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
+			ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tenantId})
 			client := db.Client()
 			ds := NewDataStoreMongoWithClient(client)
 			db.Wipe()
