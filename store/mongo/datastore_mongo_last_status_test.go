@@ -180,7 +180,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 	pastNow := now.Add(time.Hour)
 	testCases := map[string]struct {
 		deviceDeployments []model.DeviceDeployment
-		tenantId string
+		tenantId          string
 	}{
 		"last status added": {
 			deviceDeployments: []model.DeviceDeployment{
@@ -302,8 +302,8 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			if tc.tenantId!="" {
-			ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tenantId})
+			if tc.tenantId != "" {
+				ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tenantId})
 			}
 			client := db.Client()
 			ds := NewDataStoreMongoWithClient(client)
@@ -313,39 +313,44 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 				ids[i] = tc.deviceDeployments[i].DeviceId
 			}
 			deployments, e := ds.GetLastDeviceDeploymentStatus(ctx, ids)
-			assert.NoError(t, e)
-			assert.Equal(t, len(deployments), 0)
-			for i := range tc.deviceDeployments {
-				err := ds.SaveLastDeviceDeploymentStatus(ctx, tc.deviceDeployments[i])
-				assert.NoError(t, err)
-			}
-			if tc.deviceDeployments[0].DeviceId != tc.deviceDeployments[1].DeviceId &&
-				tc.deviceDeployments[0].DeviceId != tc.deviceDeployments[2].DeviceId &&
-				tc.deviceDeployments[1].DeviceId != tc.deviceDeployments[2].DeviceId {
-				for _, d := range tc.deviceDeployments {
-					deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, []string{d.DeviceId})
+			if tc.tenantId == "" {
+				assert.Error(t, e)
+				assert.EqualError(t, e, "tenant id is required")
+			} else {
+				assert.NoError(t, e)
+				assert.Equal(t, len(deployments), 0)
+				for i := range tc.deviceDeployments {
+					err := ds.SaveLastDeviceDeploymentStatus(ctx, tc.deviceDeployments[i])
+					assert.NoError(t, err)
+				}
+				if tc.deviceDeployments[0].DeviceId != tc.deviceDeployments[1].DeviceId &&
+					tc.deviceDeployments[0].DeviceId != tc.deviceDeployments[2].DeviceId &&
+					tc.deviceDeployments[1].DeviceId != tc.deviceDeployments[2].DeviceId {
+					for _, d := range tc.deviceDeployments {
+						deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, []string{d.DeviceId})
+						assert.NoError(t, e)
+						assert.Equal(t, len(deployments), 1)
+						assert.Equal(t, deployments[0].DeviceId, d.DeviceId)
+						assert.Equal(t, deployments[0].DeploymentId, d.DeploymentId)
+					}
+					deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, ids)
+					assert.NoError(t, e)
+					for i := range deployments {
+						found := false
+						for j := range tc.deviceDeployments {
+							if deployments[i].DeviceId == tc.deviceDeployments[j].DeviceId {
+								found = true
+								break
+							}
+						}
+						assert.True(t, found)
+					}
+				} else {
+					deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, ids)
 					assert.NoError(t, e)
 					assert.Equal(t, len(deployments), 1)
-					assert.Equal(t, deployments[0].DeviceId, d.DeviceId)
-					assert.Equal(t, deployments[0].DeploymentId, d.DeploymentId)
+					assert.Equal(t, deployments[0].DeviceId, tc.deviceDeployments[0].DeviceId)
 				}
-				deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, ids)
-				assert.NoError(t, e)
-				for i := range deployments {
-					found := false
-					for j := range tc.deviceDeployments {
-						if deployments[i].DeviceId == tc.deviceDeployments[j].DeviceId {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found)
-				}
-			} else {
-				deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, ids)
-				assert.NoError(t, e)
-				assert.Equal(t, len(deployments), 1)
-				assert.Equal(t, deployments[0].DeviceId, tc.deviceDeployments[0].DeviceId)
 			}
 		})
 	}
