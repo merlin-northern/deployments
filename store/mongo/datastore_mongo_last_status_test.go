@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
-	
+
 	"github.com/mendersoftware/deployments/model"
 )
 
@@ -180,6 +180,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 	pastNow := now.Add(time.Hour)
 	testCases := map[string]struct {
 		deviceDeployments []model.DeviceDeployment
+		tenantId string
 	}{
 		"last status added": {
 			deviceDeployments: []model.DeviceDeployment{
@@ -208,6 +209,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 					Id:           primitive.NewObjectID().String(),
 				},
 			},
+			tenantId: tenantId,
 		},
 		"deployment successful status stored": {
 			deviceDeployments: []model.DeviceDeployment{
@@ -236,6 +238,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 					Id:           primitive.NewObjectID().String(),
 				},
 			},
+			tenantId: tenantId,
 		},
 		"multiple failed deployments status stored": {
 			deviceDeployments: []model.DeviceDeployment{
@@ -264,13 +267,44 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 					Id:           primitive.NewObjectID().String(),
 				},
 			},
+			tenantId: tenantId,
+		},
+		"error tenant required": {
+			deviceDeployments: []model.DeviceDeployment{
+				{
+					Created:      &now,
+					Finished:     &now,
+					Status:       model.DeviceDeploymentStatusAborted,
+					DeviceId:     deviceId1,
+					DeploymentId: primitive.NewObjectID().String(),
+					Id:           primitive.NewObjectID().String(),
+				},
+				{
+					Created:      &pastNow,
+					Finished:     &pastNow,
+					Status:       model.DeviceDeploymentStatusNoArtifact,
+					DeviceId:     deviceId1,
+					DeploymentId: primitive.NewObjectID().String(),
+					Id:           primitive.NewObjectID().String(),
+				},
+				{
+					Created:      &pastNow,
+					Finished:     &pastNow,
+					Status:       model.DeviceDeploymentStatusFailure,
+					DeviceId:     deviceId1,
+					DeploymentId: primitive.NewObjectID().String(),
+					Id:           primitive.NewObjectID().String(),
+				},
+			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
+			if tc.tenantId!="" {
 			ctx = identity.WithContext(ctx, &identity.Identity{Tenant: tenantId})
+			}
 			client := db.Client()
 			ds := NewDataStoreMongoWithClient(client)
 			db.Wipe()
