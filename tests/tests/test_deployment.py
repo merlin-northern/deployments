@@ -530,7 +530,8 @@ class TestDeployment:
         last_device_deployment_status = mongo[
             "deployment_service"
         ].devices_last_status.find_one({"_id": dev.devid})
-        assert last_device_deployment_status is None
+        assert last_device_deployment_status["_id"] == dev.devid
+        assert last_device_deployment_status["device_deployment_status"] == 2560
 
     def test_device_deployments_logs(self):
         """Check that device can get next deployment, full cycle"""
