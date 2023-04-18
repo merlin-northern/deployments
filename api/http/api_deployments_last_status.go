@@ -15,13 +15,13 @@
 package http
 
 import (
-	"github.com/mendersoftware/go-lib-micro/identity"
 	"net/http"
 
 	"github.com/pkg/errors"
 
 	"github.com/ant0ine/go-json-rest/rest"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 )
