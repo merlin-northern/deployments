@@ -71,7 +71,7 @@ func (db *DataStoreMongo) GetLastDeviceDeploymentStatus(
 	if id == nil {
 		return []model.DeviceDeploymentLastStatus{}, ErrTenantRequired
 	} else {
-		tenantId=id.Tenant
+		tenantId = id.Tenant
 	}
 	filter := bson.M{
 		"_id":              bson.M{"$in": devicesIds},

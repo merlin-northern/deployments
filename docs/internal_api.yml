@@ -512,7 +512,7 @@ paths:
         500:
           $ref: "#/responses/InternalServerError"
 
-  /device/deployments/last:
+  /tenants/{tenant_id}/device/deployments/last:
     post:
       operationId: Get last device deployment status
       tags:
@@ -521,6 +521,11 @@ paths:
       description: |
         Return the status of the last unsucessful device deployment.
       parameters:
+        - name: tenant_id
+          in: path
+          description: Tenant identifier.
+          required: true
+          type: string
         - name: devicesIds
           in: body
           description: An array of device ids for which to return the statuses.
