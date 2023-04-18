@@ -15,6 +15,7 @@
 package http
 
 import (
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -34,6 +35,17 @@ func (d *DeploymentsApiHandlers) GetDeviceDeploymentLastStatus(
 
 	l.Debugf("starting")
 
+	tenantId := r.PathParam("tenant")
+	if tenantId == "" {
+		l.Error("tenant id cannot be empty")
+		rest_utils.RestErrWithLog(
+			w,
+			r,
+			l,
+			errors.New("empty tenant id"),
+			http.StatusBadRequest,
+		)
+	}
 	var devicesIds []string
 	if err := r.DecodeJsonPayload(&devicesIds); err != nil {
 		l.Errorf("error during DecodeJsonPayload: %s.", err.Error())
@@ -49,6 +61,12 @@ func (d *DeploymentsApiHandlers) GetDeviceDeploymentLastStatus(
 
 	l.Debugf("querying %d devices ids", len(devicesIds))
 	ctx := r.Context()
+	ctx = identity.WithContext(
+		ctx,
+		&identity.Identity{
+			Tenant: tenantId,
+		},
+	)
 	lastDeployments, err := d.app.GetDeviceDeploymentLastStatus(ctx, devicesIds)
 	switch err {
 	default:

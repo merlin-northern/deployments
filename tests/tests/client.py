@@ -570,11 +570,11 @@ class InternalApiClient(SwaggerApiClient):
             return {}
         return resp.json()
 
-    def get_last_device_deployment_status(self, devices_ids):
+    def get_last_device_deployment_status(self, devices_ids, tenant_id):
         # return self.client.Internal_API.Get_last_device_deployment_status(
         #     devicesIds=devices_ids
         # ).result()
-        url = self.make_api_url("/device/deployments/last")
+        url = self.make_api_url(f"/tenants/{tenant_id}/device/deployments/last")
         devices_ids_json = json.dumps(devices_ids)
         resp = requests.post(
             url, data=devices_ids_json, headers={"Content-Type": "application/json"}
