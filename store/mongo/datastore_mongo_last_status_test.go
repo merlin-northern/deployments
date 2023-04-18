@@ -206,7 +206,7 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 				},
 			},
 		},
-		"deployment successful status removed": {
+		"deployment successful status stored": {
 			deviceDeployments: []model.DeviceDeployment{
 				{
 					Created:      &now,
@@ -306,12 +306,8 @@ func TestGetLastDeviceDeploymentStatus(t *testing.T) {
 			} else {
 				deployments, e = ds.GetLastDeviceDeploymentStatus(ctx, ids)
 				assert.NoError(t, e)
-				if tc.deviceDeployments[len(tc.deviceDeployments)-1].Status == model.DeviceDeploymentStatusSuccess {
-					assert.Equal(t, len(deployments), 0)
-				} else {
-					assert.Equal(t, len(deployments), 1)
-					assert.Equal(t, deployments[0].DeviceId, tc.deviceDeployments[0].DeviceId)
-				}
+				assert.Equal(t, len(deployments), 1)
+				assert.Equal(t, deployments[0].DeviceId, tc.deviceDeployments[0].DeviceId)
 			}
 		})
 	}
