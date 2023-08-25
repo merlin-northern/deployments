@@ -64,7 +64,8 @@ const (
 )
 
 const (
-	mongoOpSet = "$set"
+	mongoOpSet  = "$set"
+	mongoOpSize = "$size"
 )
 
 var currentDbVersion map[string]*migrate.Version
@@ -416,6 +417,7 @@ const (
 	StorageKeyReleaseTags                      = "tags"
 	StorageKeyReleaseNotes                     = "notes"
 	StorageKeyReleaseArtifacts                 = "artifacts"
+	StorageKeyReleaseArtifactsCount            = "artifacts_count"
 	StorageKeyReleaseArtifactsIndexDescription = StorageKeyReleaseArtifacts + ".$." +
 		StorageKeyImageDescription
 	StorageKeyReleaseArtifactsDescription = StorageKeyReleaseArtifacts + "." +
@@ -1211,7 +1213,8 @@ func (db *DataStoreMongo) DeleteImage(ctx context.Context, id string) error {
 func getReleaseSortFieldAndOrder(filt *model.ReleaseOrImageFilter) (string, int) {
 	if filt != nil && filt.Sort != "" {
 		sortParts := strings.SplitN(filt.Sort, ":", 2)
-		if len(sortParts) == 2 && (sortParts[0] == "name" || sortParts[0] == "modified") {
+		if len(sortParts) == 2 &&
+			(sortParts[0] == "name" || sortParts[0] == "modified" || sortParts[0] == "artifacts_count") {
 			sortField := sortParts[0]
 			sortOrder := 1
 			if sortParts[1] == model.SortDirectionDescending {
