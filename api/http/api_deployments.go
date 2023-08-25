@@ -248,7 +248,7 @@ func (d *DeploymentsApiHandlers) HealthHandler(w rest.ResponseWriter, r *rest.Re
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func getReleaseOrImageFilter(r *rest.Request, paginated bool) *model.ReleaseOrImageFilter {
+func getReleaseOrImageFilter(r *rest.Request, paginated bool) *model.ReleaseOrImageFilter { // here filter
 
 	q := r.URL.Query()
 

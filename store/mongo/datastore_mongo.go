@@ -64,7 +64,8 @@ const (
 )
 
 const (
-	mongoOpSet = "$set"
+	mongoOpSet  = "$set"
+	mongoOpSize = "$size"
 )
 
 var currentDbVersion map[string]*migrate.Version
@@ -416,6 +417,7 @@ const (
 	StorageKeyReleaseTags                      = "tags"
 	StorageKeyReleaseNotes                     = "notes"
 	StorageKeyReleaseArtifacts                 = "artifacts"
+	StorageKeyReleaseArtifactsCount            = "artifacts_count"
 	StorageKeyReleaseArtifactsIndexDescription = StorageKeyReleaseArtifacts + ".$." +
 		StorageKeyImageDescription
 	StorageKeyReleaseArtifactsDescription = StorageKeyReleaseArtifacts + "." +

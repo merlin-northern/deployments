@@ -52,7 +52,7 @@ func (d *DeploymentsApiHandlers) GetReleases(w rest.ResponseWriter, r *rest.Requ
 	d.view.RenderSuccessGet(w, releases)
 }
 
-func (d *DeploymentsApiHandlers) ListReleases(w rest.ResponseWriter, r *rest.Request) {
+func (d *DeploymentsApiHandlers) ListReleases(w rest.ResponseWriter, r *rest.Request) { // here list releases
 	l := requestlog.GetRequestLogger(r)
 
 	defer redactReleaseName(r)

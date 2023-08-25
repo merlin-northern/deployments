@@ -74,15 +74,22 @@ func (db *DataStoreMongo) UpdateReleaseArtifacts(
 			StorageKeyReleaseModified: time.Now(),
 		},
 	}
-	if artifactToRemove != nil {
-		update["$pull"] = bson.M{
-			StorageKeyReleaseArtifacts: bson.M{StorageKeyId: artifactToRemove.Id},
+	if artifactToRemove != nil || artifactToAdd != nil {
+		if artifactToRemove != nil {
+			update["$pull"] = bson.M{
+				StorageKeyReleaseArtifacts: bson.M{StorageKeyId: artifactToRemove.Id},
+			}
 		}
-	}
-	if artifactToAdd != nil {
-		upsert := true
-		opt.Upsert = &upsert
-		update["$push"] = bson.M{StorageKeyReleaseArtifacts: artifactToAdd}
+		if artifactToAdd != nil {
+			upsert := true
+			opt.Upsert = &upsert
+			update["$push"] = bson.M{StorageKeyReleaseArtifacts: artifactToAdd}
+		}
+		update["$set"] = bson.M{
+			StorageKeyReleaseArtifactsCount: bson.M{
+				mongoOpSize: "$artifacts",
+			},
+		}
 	}
 	_, err := collReleases.UpdateOne(
 		ctx,
