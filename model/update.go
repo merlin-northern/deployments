@@ -42,3 +42,20 @@ type Update struct {
 	Files    []UpdateFile           `json:"files"`
 	MetaData interface{}            `json:"meta_data,omitempty" valid:"optional"`
 }
+
+func (u Update) Match(update Update) bool {
+	if len(u.Files) != len(update.Files) {
+		return false
+	}
+
+	lFiles := make(map[string]UpdateFile, len(u.Files))
+	for i, f := range u.Files {
+		lFiles[f.Name] = u.Files[i]
+	}
+	for _, f := range update.Files {
+		if _, ok := lFiles[f.Name]; !ok {
+			return false
+		}
+	}
+	return true
+}

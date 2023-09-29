@@ -399,7 +399,20 @@ func (d *Deployments) handleArtifact(ctx context.Context,
 		// this means we potentially got files and metadata separately
 		// we can now put it in the metaArtifactConstructor
 		// TODO: perhaps validate and merge with existing data, so we do a sanity check with the filenames at least
-		metaArtifactConstructor.Updates = metadata.Updates
+		if len(metaArtifactConstructor.Updates) == len(metadata.Updates) {
+			valid := true
+			for _, update := range metaArtifactConstructor.Updates {
+				for _, updateExternal := range metadata.Updates {
+					if !update.Match(updateExternal) {
+						valid = false
+						break
+					}
+				}
+			}
+			if valid {
+				metaArtifactConstructor.Updates = metadata.Updates
+			}
+		}
 	}
 	// validate artifact metadata
 	if err = metaArtifactConstructor.Validate(); err != nil {
