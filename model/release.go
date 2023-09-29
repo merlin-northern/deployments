@@ -223,3 +223,7 @@ type ReleaseOrImageFilter struct {
 	PerPage     int      `json:"per_page"`
 	Sort        string   `json:"sort"`
 }
+
+type DirectUploadMetadata struct {
+	Updates []Update `json:"updates" valid:"-"`
+}

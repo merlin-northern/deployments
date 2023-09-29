@@ -433,7 +433,20 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 
 	artifactID := r.PathParam(ParamID)
 
-	err := d.app.CompleteUpload(ctx, artifactID, d.config.EnableDirectUploadSkipVerify)
+	var metadata *model.DirectUploadMetadata
+	if d.config.EnableDirectUploadSkipVerify {
+		var directMetadata model.DirectUploadMetadata
+		if err := r.DecodeJsonPayload(&directMetadata); err != nil {
+			//return nil, err
+		} else {
+			metadata = &directMetadata
+		}
+	}
+
+	//if err := constructor.Validate(); err != nil {
+	//	return nil, err
+	//}
+	err := d.app.CompleteUpload(ctx, artifactID, d.config.EnableDirectUploadSkipVerify, metadata)
 	switch errors.Cause(err) {
 	case nil:
 		// w.Header().Set("Link", "FEAT: Upload status API")

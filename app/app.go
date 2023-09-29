@@ -127,7 +127,12 @@ type App interface {
 		expire time.Duration,
 		skipVerify bool,
 	) (*model.UploadLink, error)
-	CompleteUpload(ctx context.Context, intentID string, skipVerify bool) error
+	CompleteUpload(
+		ctx context.Context,
+		intentID string,
+		skipVerify bool,
+		metadata *model.DirectUploadMetadata,
+	) error
 	GetImage(ctx context.Context, id string) (*model.Image, error)
 	DeleteImage(ctx context.Context, imageID string) error
 	CreateImage(ctx context.Context,
@@ -305,7 +310,7 @@ func (d *Deployments) ProvisionTenant(ctx context.Context, tenant_id string) err
 // Returns image ID and nil on success.
 func (d *Deployments) CreateImage(ctx context.Context,
 	multipartUploadMsg *model.MultipartUploadMsg) (string, error) {
-	return d.handleArtifact(ctx, multipartUploadMsg, false)
+	return d.handleArtifact(ctx, multipartUploadMsg, false, nil)
 }
 
 func (d *Deployments) saveUpdateTypes(ctx context.Context, image *model.Image) {
@@ -336,6 +341,7 @@ func (d *Deployments) saveUpdateTypes(ctx context.Context, image *model.Image) {
 func (d *Deployments) handleArtifact(ctx context.Context,
 	multipartUploadMsg *model.MultipartUploadMsg,
 	skipVerify bool,
+	metadata *model.DirectUploadMetadata,
 ) (string, error) {
 
 	l := log.FromContext(ctx)
@@ -388,6 +394,12 @@ func (d *Deployments) handleArtifact(ctx context.Context,
 		_ = pW.CloseWithError(err)
 		<-ch
 		return artifactID, errors.Wrap(ErrModelParsingArtifactFailed, err.Error())
+	}
+	if skipVerify && metadata != nil {
+		// this means we potentially got files and metadata separately
+		// we can now put it in the metaArtifactConstructor
+		// TODO: perhaps validate and merge with existing data, so we do a sanity check with the filenames at least
+		metaArtifactConstructor.Updates = metadata.Updates
 	}
 	// validate artifact metadata
 	if err = metaArtifactConstructor.Validate(); err != nil {
@@ -791,6 +803,7 @@ func (d *Deployments) processUploadedArtifact(
 	artifactID string,
 	artifact io.ReadCloser,
 	skipVerify bool,
+	metadata *model.DirectUploadMetadata,
 ) error {
 	linkStatus := model.LinkStatusCompleted
 
@@ -826,6 +839,7 @@ func (d *Deployments) processUploadedArtifact(
 		ArtifactReader: artifact,
 	},
 		skipVerify,
+		metadata,
 	)
 	if err != nil {
 		l.Warnf("failed to process artifact %s: %s", artifactID, err)
@@ -845,6 +859,7 @@ func (d *Deployments) CompleteUpload(
 	ctx context.Context,
 	intentID string,
 	skipVerify bool,
+	metadata *model.DirectUploadMetadata,
 ) error {
 	l := log.FromContext(ctx)
 	idty := identity.FromContext(ctx)
@@ -896,7 +911,7 @@ func (d *Deployments) CompleteUpload(
 		return err
 	}
 	go d.processUploadedArtifact( // nolint:errcheck
-		ctxAsync, intentID, artifactReader, skipVerify,
+		ctxAsync, intentID, artifactReader, skipVerify, metadata,
 	)
 	return nil
 }
