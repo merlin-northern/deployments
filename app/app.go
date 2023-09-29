@@ -426,11 +426,15 @@ func (d *Deployments) handleArtifact(ctx context.Context,
 		return artifactID, uploadResponseErr
 	}
 
+	size := artifactReader.Count()
+	if skipVerify && metadata != nil {
+		size = metadata.Size
+	}
 	image := model.NewImage(
 		artifactID,
 		multipartUploadMsg.MetaConstructor,
 		metaArtifactConstructor,
-		artifactReader.Count(),
+		size,
 	)
 
 	// save image structure in the system

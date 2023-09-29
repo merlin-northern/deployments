@@ -225,5 +225,6 @@ type ReleaseOrImageFilter struct {
 }
 
 type DirectUploadMetadata struct {
+	Size    int64    `json:"size,omitempty" valid:"-"`
 	Updates []Update `json:"updates" valid:"-"`
 }

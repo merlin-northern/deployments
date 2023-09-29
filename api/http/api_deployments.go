@@ -436,16 +436,12 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 	var metadata *model.DirectUploadMetadata
 	if d.config.EnableDirectUploadSkipVerify {
 		var directMetadata model.DirectUploadMetadata
-		if err := r.DecodeJsonPayload(&directMetadata); err != nil {
-			//return nil, err
-		} else {
+		if err := r.DecodeJsonPayload(&directMetadata); err == nil {
+			// TODO: check if we need validation
 			metadata = &directMetadata
 		}
 	}
 
-	//if err := constructor.Validate(); err != nil {
-	//	return nil, err
-	//}
 	err := d.app.CompleteUpload(ctx, artifactID, d.config.EnableDirectUploadSkipVerify, metadata)
 	switch errors.Cause(err) {
 	case nil:
