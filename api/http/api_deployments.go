@@ -16,7 +16,6 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -439,13 +438,7 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 	var metadata *model.DirectUploadMetadata
 	if d.config.EnableDirectUploadSkipVerify {
 		var directMetadata model.DirectUploadMetadata
-		bodyBuffer := make([]byte, maxMetadataSize)
-		_, err := io.ReadFull(r.Body, bodyBuffer)
-		r.Body.Close()
-		if err != nil {
-			l.Errorf("error reading post body data: %s", err.Error())
-		}
-		err = json.Unmarshal(bodyBuffer, &directMetadata)
+		err:=r.DecodeJsonPayload(&directMetadata)
 		if err == nil {
 			if directMetadata.Validate() == nil {
 				metadata = &directMetadata
@@ -453,6 +446,21 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 		} else {
 			l.Errorf("error parsing json data: %s", err.Error())
 		}
+
+		//bodyBuffer := make([]byte, maxMetadataSize)
+		//_, err := io.ReadFull(r.Body, bodyBuffer)
+		//r.Body.Close()
+		//if err != nil {
+		//	l.Errorf("error reading post body data: %s", err.Error())
+		//}
+		//err = json.Unmarshal(bodyBuffer, &directMetadata)
+		//if err == nil {
+		//	if directMetadata.Validate() == nil {
+		//		metadata = &directMetadata
+		//	}
+		//} else {
+		//	l.Errorf("error parsing json data: %s", err.Error())
+		//}
 	}
 
 	err := d.app.CompleteUpload(ctx, artifactID, d.config.EnableDirectUploadSkipVerify, metadata)
