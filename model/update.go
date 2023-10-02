@@ -14,7 +14,10 @@
 
 package model
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // Type info structure
 type ArtifactUpdateTypeInfo struct {
@@ -58,4 +61,14 @@ func (u Update) Match(update Update) bool {
 		}
 	}
 	return true
+}
+
+const maxUpdateFiles = 1024
+
+func (u Update) Validate() error {
+	if len(u.Files) > maxUpdateFiles {
+		return errors.New("too large update files array")
+	}
+
+	return nil
 }

@@ -16,6 +16,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -427,6 +428,8 @@ func (d *DeploymentsApiHandlers) UploadLink(w rest.ResponseWriter, r *rest.Reque
 	d.view.RenderSuccessGet(w, link)
 }
 
+const maxMetadataSize = 2048
+
 func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
@@ -436,9 +439,19 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 	var metadata *model.DirectUploadMetadata
 	if d.config.EnableDirectUploadSkipVerify {
 		var directMetadata model.DirectUploadMetadata
-		if err := r.DecodeJsonPayload(&directMetadata); err == nil {
-			// TODO: check if we need validation
-			metadata = &directMetadata
+		bodyBuffer := make([]byte, maxMetadataSize)
+		_, err := io.ReadFull(r.Body, bodyBuffer)
+		r.Body.Close()
+		if err != nil {
+			l.Errorf("error reading post body data: %s", err.Error())
+		}
+		err = json.Unmarshal(bodyBuffer, &directMetadata)
+		if err == nil {
+			if directMetadata.Validate() == nil {
+				metadata = &directMetadata
+			}
+		} else {
+			l.Errorf("error parsing json data: %s", err.Error())
 		}
 	}
 
