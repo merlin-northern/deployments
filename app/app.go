@@ -395,23 +395,14 @@ func (d *Deployments) handleArtifact(ctx context.Context,
 		<-ch
 		return artifactID, errors.Wrap(ErrModelParsingArtifactFailed, err.Error())
 	}
+	validMetadata := false
 	if skipVerify && metadata != nil {
-		// this means we potentially got files and metadata separately
+		// this means we got files and metadata separately
 		// we can now put it in the metaArtifactConstructor
-		// TODO: perhaps validate and merge with existing data, so we do a sanity check with the filenames at least
-		if len(metaArtifactConstructor.Updates) == len(metadata.Updates) {
-			valid := true
-			for _, update := range metaArtifactConstructor.Updates {
-				for _, updateExternal := range metadata.Updates {
-					if !update.Match(updateExternal) {
-						valid = false
-						break
-					}
-				}
-			}
-			if valid {
-				metaArtifactConstructor.Updates = metadata.Updates
-			}
+		// after validating that the files information match the artifact
+		validMetadata = validUpdates(metaArtifactConstructor.Updates, metadata.Updates)
+		if validMetadata {
+			metaArtifactConstructor.Updates = metadata.Updates
 		}
 	}
 	// validate artifact metadata
@@ -440,7 +431,7 @@ func (d *Deployments) handleArtifact(ctx context.Context,
 	}
 
 	size := artifactReader.Count()
-	if skipVerify && metadata != nil {
+	if skipVerify && validMetadata {
 		size = metadata.Size
 	}
 	image := model.NewImage(
@@ -478,6 +469,22 @@ func (d *Deployments) handleArtifact(ctx context.Context,
 	}
 
 	return artifactID, nil
+}
+
+func validUpdates(constructorUpdates []model.Update, metadataUpdates []model.Update) bool {
+	valid := false
+	if len(constructorUpdates) == len(metadataUpdates) {
+		valid = true
+		for _, update := range constructorUpdates {
+			for _, updateExternal := range metadataUpdates {
+				if !update.Match(updateExternal) {
+					valid = false
+					break
+				}
+			}
+		}
+	}
+	return valid
 }
 
 // GenerateImage parses raw data and uploads it to the file storage - in parallel,
