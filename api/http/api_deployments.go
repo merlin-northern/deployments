@@ -449,12 +449,15 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 		//}
 
 		bodyBuffer := make([]byte, maxMetadataSize)
-		_, err := io.ReadFull(r.Body, bodyBuffer)
+		n, err := io.ReadFull(r.Body, bodyBuffer)
+		if n>0 {
+
+		}
 		r.Body.Close()
-		if err != nil {
+		if err != nil && err != io.EOF {
 			l.Errorf("error reading post body data: %s", err.Error())
 		}
-		err = json.Unmarshal(bodyBuffer, &directMetadata)
+		err = json.Unmarshal(bodyBuffer[:n], &directMetadata)
 		if err == nil {
 			if directMetadata.Validate() == nil {
 				metadata = &directMetadata
