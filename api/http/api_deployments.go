@@ -439,22 +439,13 @@ func (d *DeploymentsApiHandlers) CompleteUpload(w rest.ResponseWriter, r *rest.R
 	var metadata *model.DirectUploadMetadata
 	if d.config.EnableDirectUploadSkipVerify {
 		var directMetadata model.DirectUploadMetadata
-		//err:=r.DecodeJsonPayload(&directMetadata)
-		//if err == nil {
-		//	if directMetadata.Validate() == nil {
-		//		metadata = &directMetadata
-		//	}
-		//} else {
-		//	l.Errorf("error parsing json data: %s", err.Error())
-		//}
-
 		bodyBuffer := make([]byte, maxMetadataSize)
 		n, err := io.ReadFull(r.Body, bodyBuffer)
 		if n>0 {
 
 		}
 		r.Body.Close()
-		if err != nil && err != io.EOF {
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			l.Errorf("error reading post body data: %s", err.Error())
 		}
 		err = json.Unmarshal(bodyBuffer[:n], &directMetadata)
